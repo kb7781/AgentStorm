@@ -30,9 +30,86 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  merchant Merchant @relation(fields: [merchantId], references: [id])
+  merchant   Merchant    @relation(fields: [merchantId], references: [id])
+  orderItems OrderItem[]
 
   @@index([merchantId])
   @@index([category])
   @@map("products")
+}
+
+// ─── Day 2: Commerce ─────────────────────────────────────
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  CAPTURED
+  FAILED
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  email           String
+  status          OrderStatus @default(PENDING)
+  totalAmount     Decimal     @db.Decimal(10, 2)
+  razorpayOrderId String?     @unique
+  inventoryRestored Boolean   @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  items   OrderItem[]
+  payment Payment?
+
+  @@index([email])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model Payment {
+  id                 String        @id @default(cuid())
+  orderId            String        @unique
+  razorpayPaymentId  String?       @unique
+  razorpayOrderId    String?
+  razorpaySignature  String?
+  amount             Decimal       @db.Decimal(10, 2)
+  status             PaymentStatus @default(PENDING)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  type      String
+  entityId  String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([entityId])
+  @@map("events")
 }

@@ -5,7 +5,11 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding AgentStorm database...");
 
-  // Clear existing data
+  // Clear existing data (respect FK order: events -> payments → order_items → orders → products → merchants)
+  await prisma.event.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.orderItem.deleteMany();
+  await prisma.order.deleteMany();
   await prisma.product.deleteMany();
   await prisma.merchant.deleteMany();
 

@@ -18,7 +18,17 @@ function formatPrice(price: string | number): string {
   }).format(Number(price));
 }
 
-export default function ProductCard({ product }: { product: Product }) {
+interface ProductCardProps {
+  product: Product;
+  onAddToCart?: (product: Product) => void;
+  cartQuantity?: number;
+}
+
+export default function ProductCard({
+  product,
+  onAddToCart,
+  cartQuantity = 0,
+}: ProductCardProps) {
   const colorClass =
     categoryColors[product.category] ||
     "bg-gray-500/10 text-gray-400 border-gray-500/20";
@@ -29,6 +39,9 @@ export default function ProductCard({ product }: { product: Product }) {
       : product.stock > 5
         ? "text-amber-400"
         : "text-red-400";
+
+  const isOutOfStock = product.stock === 0;
+  const isMaxedInCart = cartQuantity >= product.stock;
 
   return (
     <div className="group relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.04]">
@@ -52,11 +65,33 @@ export default function ProductCard({ product }: { product: Product }) {
         {product.description}
       </p>
 
-      {/* Price */}
+      {/* Price + Add to Cart */}
       <div className="flex items-end justify-between">
         <span className="text-lg font-bold text-white/90">
           {formatPrice(product.price)}
         </span>
+        {onAddToCart && (
+          <button
+            id={`add-to-cart-${product.id}`}
+            onClick={() => onAddToCart(product)}
+            disabled={isOutOfStock || isMaxedInCart}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+              isOutOfStock
+                ? "bg-white/[0.03] text-white/20 cursor-not-allowed"
+                : isMaxedInCart
+                  ? "bg-violet-500/10 text-violet-400/60 border border-violet-500/20 cursor-not-allowed"
+                  : "bg-violet-500/15 text-violet-400 border border-violet-500/20 hover:bg-violet-500/25 hover:text-violet-300 active:scale-95"
+            }`}
+          >
+            {isOutOfStock
+              ? "Out of Stock"
+              : isMaxedInCart
+                ? `${cartQuantity} in cart`
+                : cartQuantity > 0
+                  ? `In cart (${cartQuantity})`
+                  : "Add to Cart"}
+          </button>
+        )}
       </div>
     </div>
   );
