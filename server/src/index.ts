@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import cors from "cors";
 import healthRouter from "./routes/health";
 import productsRouter from "./routes/products";
@@ -14,6 +14,25 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Root health & info
+app.get("/", (_req: Request, res: Response) => {
+  res.json({
+    name: "AgentStorm Commerce & Simulation API ⚡",
+    status: "online",
+    version: "1.0.0",
+    endpoints: {
+      health: "/api/health",
+      products: "/api/products",
+      buyers: "/api/buyers",
+      buyerAnalytics: "/api/buyers/analytics",
+      simulations: "/api/simulations/scenarios",
+      simulationAnalytics: "/api/simulations/analytics",
+      orders: "/api/orders",
+      events: "/api/events",
+    },
+  });
+});
 
 // Routes
 app.use("/api/health", healthRouter);
