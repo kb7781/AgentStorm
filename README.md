@@ -16,8 +16,8 @@ The complete AgentStorm system has undergone rigorous automated testing across d
 - ✅ **Atomic Inventory Reservation**: Concurrency races resolve cleanly without inventory corruption.
 - ✅ **Idempotent Payment Recovery**: Stock is restored exactly once upon test payment failure or order cancellation.
 - ✅ **0 LLM Calls for Unambiguous Decisions**: 100% deterministic bypass when 0 or 1 candidate product matches.
-- ✅ **Maximum 1 Compact Groq Call**: Only calls the LLM when multiple eligible products require persona selection (`max_tokens: 256`, `temp: 0.1`).
-- ✅ **Immediate Deterministic Fallback**: Seamless, instant failover when Groq is unavailable or rate-limited (HTTP 429) with zero retry storms.
+- ✅ **Maximum 1 Compact Groq Call**: Only calls the LLM when multiple eligible products require persona-based selection (`max_tokens: 256`, `temperature: 0.1`).
+- ✅ **Immediate Deterministic Fallback**: Seamless failover when Groq is unavailable or rate-limited (HTTP 429), without retry storms.
 - ✅ **Dynamic Intelligence Analytics**: All Buyer Intelligence and Simulation Intelligence metrics are derived dynamically from database records and runtime telemetry.
 - ✅ **Build & Type Validation**: Server TypeScript validation, Prisma schema verification, and Next.js client production builds compile with 0 errors.
 
@@ -25,17 +25,30 @@ The complete AgentStorm system has undergone rigorous automated testing across d
 
 ## 🎬 Live Demo & Modules
 
-- 🌐 **Live Web Application (Vercel)**: **[https://agent-storm-psi.vercel.app](https://agent-storm-psi.vercel.app)**
-- ⚙️ **Live Backend API (Render)**: **[https://agentstorm.onrender.com](https://agentstorm.onrender.com)**
+- 🌐 **Live Web Application (Vercel)**: **https://agent-storm-psi.vercel.app**
+- ⚙️ **Live Backend API (Render)**: **https://agentstorm.onrender.com**
 - 💻 **Local Development**: `http://localhost:3000` (API: `http://localhost:3001`)
 
 The interactive dashboard provides 5 integrated modules:
 
-1. **🛍️ Products & Cart**: Live catalog with real-time stock counters, multi-item cart, and Razorpay test-mode checkout.
-2. **⚡ AI Buyers**: Launch autonomous buyers across 4 personas (`Budget Shopper`, `Power User`, `Deal Hunter`, `Impulse Buyer`) with real-time decision traces.
+1. **🛍️ Products & Cart**: Live catalog with real-time stock counters, multi-item cart, and **Razorpay Test Mode checkout for manual purchases**.
+2. **⚡ AI Buyers**: Launch autonomous buyers across 4 personas (`Budget Shopper`, `Power User`, `Deal Hunter`, `Impulse Buyer`) with real-time decision traces and automated order execution.
 3. **🌪️ Simulation Storm**: Run concurrent stress scenarios (`Flash Sale`, `Market Storm`, `Payment Chaos`) with live stock conservation auditing.
 4. **🧠 Buyer Intelligence**: Inspect buyer decision telemetry, dynamic budget utilization, product rejection reasons, and preferred items.
 5. **📊 Simulation Intelligence**: View cross-scenario comparison matrices, 0 oversell verification, and automated deterministic engineering insights.
+
+### 🎯 Recommended Demo Flow
+
+For the fastest evaluation of AgentStorm:
+
+1. **🛍️ Products & Cart** — Browse the live catalog and inspect real-time inventory.
+2. **⚡ AI Buyers** — Run an autonomous buyer and inspect its decision trace, persona, candidate filtering, and purchase outcome.
+3. **🌪️ Simulation Storm** — Run **Flash Sale** to demonstrate concurrent inventory contention and verify `0` oversell / `0` negative stock.
+4. **🧠 Buyer Intelligence** — Inspect decision telemetry, budget utilization, rejection reasons, and LLM/fallback decision modes.
+5. **📊 Simulation Intelligence** — Compare scenarios and inspect stock-conservation verification and deterministic reliability insights.
+6. **💳 Manual Checkout** — From **Products & Cart**, complete a manual purchase using **Razorpay Test Mode** to demonstrate the `PENDING → PAID` payment lifecycle.
+
+> **Important:** Razorpay Test Mode checkout is used for **manual purchases** through the Products & Cart module. Autonomous AI Buyers and Simulation Storms operate independently of the manual Razorpay checkout UI and focus on automated order execution, inventory contention, payment-state transitions, and recovery.
 
 ---
 
@@ -48,7 +61,7 @@ The interactive dashboard provides 5 integrated modules:
 - [🌪️ Simulation Storms & Scenarios](#️-simulation-storms--scenarios)
 - [🧠 Buyer Intelligence & Decision Analytics](#-buyer-intelligence--decision-analytics)
 - [📊 Simulation Intelligence & Scenario Analytics](#-simulation-intelligence--scenario-analytics)
-- [🛡️ ACID Order & Payment Lifecycle](#️-acid-order--payment-lifecycle)
+- [🛡️ Order & Payment Lifecycle](#️-order--payment-lifecycle)
 - [⚡ Token-Optimized Groq & Fallback Engine](#-token-optimized-groq--fallback-engine)
 - [📐 Deterministic Reliability Audit Engine](#-deterministic-reliability-audit-engine)
 - [🔌 API Reference](#-api-reference)
@@ -62,8 +75,9 @@ The interactive dashboard provides 5 integrated modules:
 ## 🎯 The Problem AgentStorm Solves
 
 As autonomous AI agents increasingly browse and purchase products on behalf of consumers, e-commerce backends will face novel traffic profiles:
+
 1. **Sub-second Inventory Contention**: Multiple autonomous agents attempting to claim the same limited stock units simultaneously.
-2. **Abandoned Checkouts & Drops**: AI agents dropping checkout sessions when unexpected price discrepancies or network failures occur.
+2. **Order & Payment Drops**: Orders becoming unsuccessful because of simulated payment failures, cancellations, or interrupted checkout flows.
 3. **LLM Cost Explosions & Rate Limits**: Unoptimized multi-turn agent loops consuming excessive tokens per purchase attempt.
 4. **Data Corruption & Overselling**: Race conditions between inventory inspection and order creation leading to negative stock ledgers.
 
@@ -73,7 +87,7 @@ As autonomous AI agents increasingly browse and purchase products on behalf of c
 
 ## 🏗️ System Architecture
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                 Next.js 16 Client (Dark Theme UI)                                │
 │   🛍️ Catalog & Cart  │  ⚡ AI Buyers  │  🌪️ Simulation Storm  │  🧠 Buyer Intel  │  📊 Sim Intel  │
