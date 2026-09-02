@@ -23,9 +23,13 @@ The complete AgentStorm system has undergone rigorous automated testing across d
 
 ---
 
-## 🎬 Demo
+## 🎬 Live Demo & Modules
 
-The AgentStorm interactive dashboard runs locally at **[http://localhost:3000](http://localhost:3000)** (Backend API at **[http://localhost:3001](http://localhost:3001)**) and provides 5 integrated modules:
+- 🌐 **Live Web Application (Vercel)**: **[https://agent-storm-psi.vercel.app](https://agent-storm-psi.vercel.app)**
+- ⚙️ **Live Backend API (Render)**: **[https://agentstorm.onrender.com](https://agentstorm.onrender.com)**
+- 💻 **Local Development**: `http://localhost:3000` (API: `http://localhost:3001`)
+
+The interactive dashboard provides 5 integrated modules:
 
 1. **🛍️ Products & Cart**: Live catalog with real-time stock counters, multi-item cart, and Razorpay test-mode checkout.
 2. **⚡ AI Buyers**: Launch autonomous buyers across 4 personas (`Budget Shopper`, `Power User`, `Deal Hunter`, `Impulse Buyer`) with real-time decision traces.
