@@ -389,5 +389,4 @@ bash scratch/verify_day7.sh
 
 ---
 
-## 📄 License
-MIT License. Built for the Google DeepMind & Agentic Commerce Hackathon.
+
