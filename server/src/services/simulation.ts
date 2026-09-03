@@ -136,27 +136,31 @@ async function executeSimulationScenario(scenarioId: string): Promise<Simulation
   });
 
   try {
-    // 1. Setup baseline stock before simulation (only for scenarios with explicit stock config)
-    if (scenario.stockLimitSetup) {
-      if (scenario.stockLimitSetup.productNameSnippet) {
-        await prisma.product.updateMany({
-          where: {
-            name: { contains: scenario.stockLimitSetup.productNameSnippet, mode: "insensitive" },
-          },
-          data: {
-            stock: scenario.stockLimitSetup.stock,
-          },
+    // 1. Snapshot TRUE INITIAL INVENTORY across all active products BEFORE any scenario setup/limits
+    const trueInitialProducts = await prisma.product.findMany({
+      select: { id: true, name: true, stock: true },
+    });
+    const trueInitialStockTotal = trueInitialProducts.reduce((sum, p) => sum + p.stock, 0);
+
+    // 2. Setup temporary Flash Sale capacity if scenario defines stockLimitSetup
+    let flashSaleTargetProductId: string | null = null;
+    let flashSaleCapacity = 0;
+
+    if (scenario.stockLimitSetup && scenario.stockLimitSetup.productNameSnippet) {
+      const targetProduct = trueInitialProducts.find((p) =>
+        p.name.toLowerCase().includes(scenario.stockLimitSetup!.productNameSnippet!.toLowerCase())
+      );
+      if (targetProduct) {
+        flashSaleTargetProductId = targetProduct.id;
+        flashSaleCapacity = scenario.stockLimitSetup.stock;
+
+        // Temporarily expose Flash Sale capacity in database for buyer contention
+        await prisma.product.update({
+          where: { id: targetProduct.id },
+          data: { stock: flashSaleCapacity },
         });
       }
     }
-    // No else: Market Storm and Payment Chaos use real database stock.
-    // If stock is 0, buyers will correctly get NO_ELIGIBLE_INVENTORY or EXPECTED_CONTENTION.
-
-    // 2. Snapshot Initial Stock across all active products
-    const initialProducts = await prisma.product.findMany({
-      select: { id: true, name: true, stock: true },
-    });
-    const initialStockTotal = initialProducts.reduce((sum, p) => sum + p.stock, 0);
 
     // 3. Launch concurrent AI Buyers simultaneously
     const buyerPromises = scenario.buyerIds.map((buyerId, index) =>
@@ -235,28 +239,54 @@ async function executeSimulationScenario(scenarioId: string): Promise<Simulation
       }
     }
 
-    // 5. Snapshot Final Stock and verify Inventory Integrity
-    const finalProducts = await prisma.product.findMany({
-      select: { id: true, name: true, stock: true },
-    });
-    const finalStockTotal = finalProducts.reduce((sum, p) => sum + p.stock, 0);
-
+    // 5. Calculate Net Purchased Units per product across active (non-cancelled/non-failed) orders
     const activeOrderIds = orderSummaries
-      .filter((o) => o.status !== "CANCELLED")
+      .filter((o) => o.status !== "CANCELLED" && o.status !== "FAILED")
       .map((o) => o.orderId);
 
     const activeOrderItems = activeOrderIds.length > 0
       ? await prisma.orderItem.findMany({
           where: { orderId: { in: activeOrderIds } },
-          select: { quantity: true },
+          select: { productId: true, quantity: true },
         })
       : [];
 
-    const netPurchasedUnits = activeOrderItems.reduce((sum, it) => sum + it.quantity, 0);
-    const expectedFinalStock = initialStockTotal - netPurchasedUnits;
+    const netPurchasedByProduct = new Map<string, number>();
+    let totalNetPurchasedUnits = 0;
+    for (const item of activeOrderItems) {
+      const prev = netPurchasedByProduct.get(item.productId) || 0;
+      netPurchasedByProduct.set(item.productId, prev + item.quantity);
+      totalNetPurchasedUnits += item.quantity;
+    }
 
-    const negativeStockProducts = finalProducts.filter((p) => p.stock < 0);
-    const oversellCount = negativeStockProducts.length;
+    // 6. Update Real Database Inventory: finalRealStock = trueInitialStock - netPurchasedUnits
+    for (const p of trueInitialProducts) {
+      const purchased = netPurchasedByProduct.get(p.id) || 0;
+      const finalRealStock = Math.max(0, p.stock - purchased);
+      await prisma.product.update({
+        where: { id: p.id },
+        data: { stock: finalRealStock },
+      });
+    }
+
+    // 7. Verify Inventory Integrity & Conservation
+    const finalProductsInDb = await prisma.product.findMany({
+      select: { id: true, name: true, stock: true },
+    });
+    const finalStockTotal = finalProductsInDb.reduce((sum, p) => sum + p.stock, 0);
+    const expectedFinalStock = trueInitialStockTotal - totalNetPurchasedUnits;
+
+    // Detect negative stock or oversell beyond Flash Sale capacity
+    const negativeStockProducts = finalProductsInDb.filter((p) => p.stock < 0);
+    let oversellCount = negativeStockProducts.length;
+
+    if (flashSaleTargetProductId) {
+      const targetPurchased = netPurchasedByProduct.get(flashSaleTargetProductId) || 0;
+      if (targetPurchased > flashSaleCapacity) {
+        oversellCount += (targetPurchased - flashSaleCapacity);
+      }
+    }
+
     const isSafe = oversellCount === 0 && finalStockTotal === expectedFinalStock;
 
     const durationMs = Date.now() - startTime;
@@ -282,7 +312,7 @@ async function executeSimulationScenario(scenarioId: string): Promise<Simulation
       inventoryIntegrity: {
         isSafe,
         oversellCount,
-        initialStockTotal,
+        initialStockTotal: trueInitialStockTotal,
         finalStockTotal,
         expectedFinalStock,
       },
@@ -310,7 +340,7 @@ async function executeSimulationScenario(scenarioId: string): Promise<Simulation
       inventoryIntegrity: {
         isSafe,
         oversellCount,
-        initialStockTotal,
+        initialStockTotal: trueInitialStockTotal,
         finalStockTotal,
         expectedFinalStock,
       },
@@ -330,16 +360,6 @@ async function executeSimulationScenario(scenarioId: string): Promise<Simulation
       contentionLosses,
       overallScore: report.overallScore,
     });
-
-    // 6. Restore product stock to pre-simulation levels
-    // Simulations are stress tests — they should not permanently deplete the catalog.
-    // All integrity checks above used real post-simulation stock; this cleanup is cosmetic.
-    for (const snap of initialProducts) {
-      await prisma.product.update({
-        where: { id: snap.id },
-        data: { stock: snap.stock },
-      });
-    }
 
     return result;
   } catch (err) {
