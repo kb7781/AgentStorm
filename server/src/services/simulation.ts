@@ -331,6 +331,16 @@ async function executeSimulationScenario(scenarioId: string): Promise<Simulation
       overallScore: report.overallScore,
     });
 
+    // 6. Restore product stock to pre-simulation levels
+    // Simulations are stress tests — they should not permanently deplete the catalog.
+    // All integrity checks above used real post-simulation stock; this cleanup is cosmetic.
+    for (const snap of initialProducts) {
+      await prisma.product.update({
+        where: { id: snap.id },
+        data: { stock: snap.stock },
+      });
+    }
+
     return result;
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "Simulation run failed";
