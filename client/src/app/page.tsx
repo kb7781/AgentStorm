@@ -49,10 +49,59 @@ export default function Home() {
   // Cart state: Map of productId -> CartItem
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
   const [showCart, setShowCart] = useState(false);
+  const [isCartHydrated, setIsCartHydrated] = useState(false);
 
   // Checkout state
   const [checkout, setCheckout] = useState<CheckoutState>({ step: "idle" });
   const [activeTab, setActiveTab] = useState<ActiveTab>("products");
+
+  // Hydrate cart from localStorage on client mount (prevents SSR hydration mismatch)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("agentstorm_cart");
+      if (stored) {
+        const parsed: CartItem[] = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const loadedMap = new Map<string, CartItem>();
+          for (const item of parsed) {
+            if (
+              item &&
+              item.product &&
+              typeof item.product.id === "string" &&
+              typeof item.quantity === "number" &&
+              item.quantity > 0
+            ) {
+              loadedMap.set(item.product.id, {
+                product: item.product,
+                quantity: Math.max(1, Math.floor(item.quantity)),
+              });
+            }
+          }
+          setCart(loadedMap);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load cart from localStorage:", err);
+      // Safe fallback to empty cart
+    } finally {
+      setIsCartHydrated(true);
+    }
+  }, []);
+
+  // Persist cart to localStorage whenever cart state changes (after initial hydration)
+  useEffect(() => {
+    if (!isCartHydrated) return;
+    try {
+      const itemsArray = Array.from(cart.values());
+      if (itemsArray.length === 0) {
+        localStorage.removeItem("agentstorm_cart");
+      } else {
+        localStorage.setItem("agentstorm_cart", JSON.stringify(itemsArray));
+      }
+    } catch (err) {
+      console.error("Failed to save cart to localStorage:", err);
+    }
+  }, [cart, isCartHydrated]);
 
   // Fetch products
   useEffect(() => {
@@ -76,6 +125,29 @@ export default function Home() {
 
     fetchProducts();
   }, []);
+
+  // Sync fresh product metadata & stock caps to hydrated cart items
+  useEffect(() => {
+    if (products.length === 0 || cart.size === 0) return;
+    setCart((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const [id, item] of prev.entries()) {
+        const fresh = products.find((p) => p.id === id);
+        if (fresh) {
+          const cappedQty = Math.min(item.quantity, fresh.stock);
+          if (cappedQty <= 0) {
+            next.delete(id);
+            changed = true;
+          } else if (item.product.stock !== fresh.stock || item.product.price !== fresh.price || item.quantity !== cappedQty) {
+            next.set(id, { product: fresh, quantity: cappedQty });
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [products]);
 
   // Cart operations
   const addToCart = useCallback(
