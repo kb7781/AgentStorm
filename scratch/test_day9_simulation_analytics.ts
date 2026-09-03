@@ -29,10 +29,14 @@ async function main() {
   assert(simFlash.inventoryIntegrity.isSafe, `Flash Sale inventory integrity isSafe: true`);
   assert(simFlash.inventoryIntegrity.oversellCount === 0, `Flash Sale oversellCount: 0`);
 
+  // Reset stock before Market Storm (simulations no longer silently reset stock)
+  await prisma.product.updateMany({ data: { stock: 50 } });
   const simMarket = await runSimulation("market-storm");
   assert(simMarket.inventoryIntegrity.isSafe, `Market Storm inventory integrity isSafe: true`);
   assert(simMarket.inventoryIntegrity.oversellCount === 0, `Market Storm oversellCount: 0`);
 
+  // Reset stock before Payment Chaos (simulations no longer silently reset stock)
+  await prisma.product.updateMany({ data: { stock: 50 } });
   const simChaos = await runSimulation("payment-chaos");
   assert(simChaos.inventoryIntegrity.isSafe, `Payment Chaos inventory integrity isSafe: true`);
   assert(simChaos.ordersPaid === 1, `Payment Chaos 1 paid order confirmed`);

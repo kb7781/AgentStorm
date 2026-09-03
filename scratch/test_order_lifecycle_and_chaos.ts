@@ -126,6 +126,9 @@ async function main() {
 
   // ─── 4. Payment Chaos Simulation (1 Paid, 2 Cancelled) ───────────
   console.log("\n[Lifecycle 4] Payment Chaos Simulation (1 Paid, 2 Cancelled & Restored)...");
+  // Reset stock so all 3 buyers can find in-stock products
+  // (simulation no longer silently resets stock — tests own their preconditions)
+  await prisma.product.updateMany({ data: { stock: 50 } });
   const simChaos = await runSimulation("payment-chaos");
 
   assert(simChaos.totalBuyers === 3, `Total chaos buyers: ${simChaos.totalBuyers}`);
