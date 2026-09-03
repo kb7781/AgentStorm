@@ -136,7 +136,7 @@ async function executeSimulationScenario(scenarioId: string): Promise<Simulation
   });
 
   try {
-    // 1. Setup baseline stock before simulation
+    // 1. Setup baseline stock before simulation (only for scenarios with explicit stock config)
     if (scenario.stockLimitSetup) {
       if (scenario.stockLimitSetup.productNameSnippet) {
         await prisma.product.updateMany({
@@ -148,12 +148,9 @@ async function executeSimulationScenario(scenarioId: string): Promise<Simulation
           },
         });
       }
-    } else {
-      await prisma.product.updateMany({
-        where: { stock: { lte: 2 } },
-        data: { stock: 50 },
-      });
     }
+    // No else: Market Storm and Payment Chaos use real database stock.
+    // If stock is 0, buyers will correctly get NO_ELIGIBLE_INVENTORY or EXPECTED_CONTENTION.
 
     // 2. Snapshot Initial Stock across all active products
     const initialProducts = await prisma.product.findMany({
