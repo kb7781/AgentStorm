@@ -77,6 +77,8 @@ export interface BuyerRunResult {
   actions: BuyerAction[];
   orderId?: string;
   selectedProduct?: string;
+  selectionReason?: string;
+  decisionMode?: "direct_deterministic" | "groq_ai" | "deterministic_fallback";
   totalAmount?: number;
   orderStatus?: string;
   totalSteps: number;
@@ -383,6 +385,8 @@ export async function runBuyer(personaId: string): Promise<BuyerRunResult> {
           status: "completed",
           outcome: "OUT_OF_BUDGET",
           actions,
+          selectionReason: reason,
+          decisionMode: "direct_deterministic",
           totalSteps: actions.length,
           error: reason,
           provider: "groq",
@@ -390,7 +394,7 @@ export async function runBuyer(personaId: string): Promise<BuyerRunResult> {
           fallbackUsed: false,
         };
       } else {
-        const reason = `All eligible products for "${persona.goal}" within budget are currently out of stock.`;
+        const reason = `All ${budgetCandidates.length} eligible product(s) matching "${persona.goal}" within budget of ₹${persona.budget.toLocaleString("en-IN")} are currently out of stock.`;
         selectionReason = reason;
         addAction("decision", reason);
         addAction("ended", "Shopping session ended — no in-stock inventory available");
@@ -422,6 +426,8 @@ export async function runBuyer(personaId: string): Promise<BuyerRunResult> {
           status: "completed",
           outcome: "NO_ELIGIBLE_INVENTORY",
           actions,
+          selectionReason: reason,
+          decisionMode: "direct_deterministic",
           totalSteps: actions.length,
           error: reason,
           provider: "groq",
@@ -439,10 +445,10 @@ export async function runBuyer(personaId: string): Promise<BuyerRunResult> {
       // Exact 1 candidate: Unambiguous match → 0 LLM calls needed!
       decisionMode = "direct_deterministic";
       rankedCandidates = inStockCandidates;
-      selectionReason = `Direct selection: Only in-stock candidate within budget.`;
+      selectionReason = `${rankedCandidates[0].name} (₹${rankedCandidates[0].price.toLocaleString("en-IN")}) was selected because it is the only in-stock option matching "${persona.goal}" within budget of ₹${persona.budget.toLocaleString("en-IN")}.`;
       addAction(
         "decision",
-        `Direct selection: ${rankedCandidates[0].name} (₹${rankedCandidates[0].price.toLocaleString("en-IN")}) is the only in-stock option within budget.`
+        `Direct selection: ${selectionReason}`
       );
     } else {
       // Multiple candidates (>1): Attempt ONE compact LLM call to choose based on persona taste
@@ -466,7 +472,7 @@ export async function runBuyer(personaId: string): Promise<BuyerRunResult> {
 
           if (chosenCandidate) {
             decisionMode = "groq_ai";
-            selectionReason = `Groq selection (${llmRes.model}): ${llmRes.decision.reason}`;
+            selectionReason = llmRes.decision.reason;
             const remaining = inStockCandidates.filter((c) => c.id !== chosenId);
             rankedCandidates = [chosenCandidate, ...rankCandidatesByPersona(remaining, persona.id)];
 
@@ -521,10 +527,20 @@ export async function runBuyer(personaId: string): Promise<BuyerRunResult> {
       if (!llmSuccess) {
         decisionMode = "deterministic_fallback";
         rankedCandidates = rankCandidatesByPersona(inStockCandidates, persona.id);
-        selectionReason = `Deterministic heuristic ranking for ${persona.name}`;
+
+        if (persona.id === "budget-shopper") {
+          selectionReason = `${rankedCandidates[0].name} was selected because at ₹${rankedCandidates[0].price.toLocaleString("en-IN")} it is the lowest-priced in-stock option matching the ₹${persona.budget.toLocaleString("en-IN")} budget.`;
+        } else if (persona.id === "power-user") {
+          selectionReason = `${rankedCandidates[0].name} was selected because at ₹${rankedCandidates[0].price.toLocaleString("en-IN")} it provides the highest specifications and performance within the ₹${persona.budget.toLocaleString("en-IN")} budget.`;
+        } else if (persona.id === "deal-hunter") {
+          selectionReason = `${rankedCandidates[0].name} was selected because at ₹${rankedCandidates[0].price.toLocaleString("en-IN")} it offers the optimal quality-to-price value ratio among eligible products within the ₹${persona.budget.toLocaleString("en-IN")} budget.`;
+        } else {
+          selectionReason = `${rankedCandidates[0].name} was selected as the top matching candidate product within the ₹${persona.budget.toLocaleString("en-IN")} budget.`;
+        }
+
         addAction(
           "decision",
-          `Deterministic heuristic: Selected ${rankedCandidates[0].name} (₹${rankedCandidates[0].price.toLocaleString("en-IN")}) according to ${persona.name} strategy.`
+          `Deterministic heuristic: ${selectionReason}`
         );
 
         for (let i = 1; i < rankedCandidates.length; i++) {
@@ -684,6 +700,8 @@ export async function runBuyer(personaId: string): Promise<BuyerRunResult> {
         actions,
         orderId,
         selectedProduct: productName,
+        selectionReason: selectionReason || `Selected ${productName} as best match for ${persona.name}`,
+        decisionMode,
         totalAmount,
         orderStatus: outcome.status || "PENDING",
         totalSteps: actions.length,
@@ -726,6 +744,8 @@ export async function runBuyer(personaId: string): Promise<BuyerRunResult> {
         status: "completed",
         outcome: "EXPECTED_CONTENTION",
         actions,
+        selectionReason: reason,
+        decisionMode,
         totalSteps: actions.length,
         error: reason,
         provider: "groq",

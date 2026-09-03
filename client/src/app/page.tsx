@@ -17,6 +17,7 @@ import BuyerPanel from "@/components/BuyerPanel";
 import SimulationPanel from "@/components/SimulationPanel";
 import BuyerIntelligence from "@/components/BuyerIntelligence";
 import SimulationIntelligence from "@/components/SimulationIntelligence";
+import ProductDetailsModal from "@/components/ProductDetailsModal";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -50,6 +51,7 @@ export default function Home() {
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
   const [showCart, setShowCart] = useState(false);
   const [isCartHydrated, setIsCartHydrated] = useState(false);
+  const [selectedProductForDetails, setSelectedProductForDetails] = useState<Product | null>(null);
 
   // Checkout state
   const [checkout, setCheckout] = useState<CheckoutState>({ step: "idle" });
@@ -589,6 +591,7 @@ export default function Home() {
                     key={product.id}
                     product={product}
                     onAddToCart={addToCart}
+                    onViewDetails={(p) => setSelectedProductForDetails(p)}
                     cartQuantity={cart.get(product.id)?.quantity || 0}
                   />
                 ))}
@@ -608,15 +611,15 @@ export default function Home() {
 
           {/* Cart sidebar */}
           {showCart && (
-            <div className="w-[380px] shrink-0">
-              <div className="sticky top-6">
+            <div className="w-80 flex-shrink-0">
+              <div className="sticky top-24">
                 <Cart
                   items={cartItems}
                   onUpdateQuantity={updateQuantity}
                   onRemoveItem={removeItem}
-                  onCheckout={handleCheckout}
-                  isCheckingOut={isCheckingOut}
                   onClose={() => setShowCart(false)}
+                  onCheckout={handleCheckout}
+                  isCheckingOut={checkout.step !== "idle" && checkout.step !== "success" && checkout.step !== "failed"}
                 />
               </div>
             </div>
@@ -624,6 +627,18 @@ export default function Home() {
         </div>
         )}
       </div>
+
+      {/* Product Details Modal */}
+      <ProductDetailsModal
+        product={selectedProductForDetails}
+        onClose={() => setSelectedProductForDetails(null)}
+        onAddToCart={addToCart}
+        cartQuantity={
+          selectedProductForDetails
+            ? cart.get(selectedProductForDetails.id)?.quantity || 0
+            : 0
+        }
+      />
     </main>
   );
 }

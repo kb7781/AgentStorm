@@ -30,6 +30,8 @@ interface BuyerRunResult {
   actions: BuyerAction[];
   orderId?: string;
   selectedProduct?: string;
+  selectionReason?: string;
+  decisionMode?: "direct_deterministic" | "groq_ai" | "deterministic_fallback";
   totalAmount?: number;
   orderStatus?: string;
   totalSteps: number;
@@ -308,6 +310,33 @@ export default function BuyerPanel() {
                       </span>
                     </div>
                   )}
+
+                  {/* AI Decision Explanation Card */}
+                  <div className="mb-3 rounded-lg border border-violet-500/25 bg-violet-500/10 p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-violet-300">
+                        Decision Summary
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-medium border border-violet-500/30">
+                        {result.decisionMode === "groq_ai"
+                          ? "Groq AI Decision"
+                          : result.decisionMode === "direct_deterministic"
+                            ? "Direct Selection (0 LLM Calls)"
+                            : "Deterministic Strategy"}
+                      </span>
+                    </div>
+                    {result.selectedProduct && (
+                      <div className="text-xs font-bold text-white mb-1">
+                        Decision: <span className="text-emerald-300">{result.selectedProduct}</span>
+                      </div>
+                    )}
+                    <div className="text-xs text-white/80">
+                      <span className="font-semibold text-white/90 block text-[11px] mb-0.5">Why this product?</span>
+                      <p className="leading-relaxed text-white/70 text-[11.5px]">
+                        {result.selectionReason || result.error || "Selected according to buyer persona criteria and inventory availability."}
+                      </p>
+                    </div>
+                  </div>
 
                   {/* Order info */}
                   {result.orderId && (

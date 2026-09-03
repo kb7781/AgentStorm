@@ -21,12 +21,14 @@ function formatPrice(price: string | number): string {
 interface ProductCardProps {
   product: Product;
   onAddToCart?: (product: Product) => void;
+  onViewDetails?: (product: Product) => void;
   cartQuantity?: number;
 }
 
 export default function ProductCard({
   product,
   onAddToCart,
+  onViewDetails,
   cartQuantity = 0,
 }: ProductCardProps) {
   const colorClass =
@@ -45,7 +47,7 @@ export default function ProductCard({
 
   return (
     <div className="group relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.04]">
-      {/* Category badge */}
+      {/* Category badge & Stock */}
       <div className="mb-3 flex items-center justify-between">
         <span
           className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${colorClass}`}
@@ -57,23 +59,39 @@ export default function ProductCard({
         </span>
       </div>
 
-      {/* Product info */}
-      <h3 className="mb-1.5 text-sm font-semibold text-white/90 group-hover:text-white transition-colors">
-        {product.name}
-      </h3>
-      <p className="mb-4 text-xs leading-relaxed text-white/40 line-clamp-2">
-        {product.description}
-      </p>
+      {/* Product info (Clickable to view details) */}
+      <div
+        className="cursor-pointer"
+        onClick={() => onViewDetails && onViewDetails(product)}
+      >
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <h3 className="text-sm font-semibold text-white/90 group-hover:text-white transition-colors">
+            {product.name}
+          </h3>
+          <span className="text-[11px] font-medium text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity">
+            Details &rarr;
+          </span>
+        </div>
+        <p className="mb-4 text-xs leading-relaxed text-white/40 line-clamp-2">
+          {product.description}
+        </p>
+      </div>
 
       {/* Price + Add to Cart */}
       <div className="flex items-end justify-between">
-        <span className="text-lg font-bold text-white/90">
+        <span
+          className="text-lg font-bold text-white/90 cursor-pointer"
+          onClick={() => onViewDetails && onViewDetails(product)}
+        >
           {formatPrice(product.price)}
         </span>
         {onAddToCart && (
           <button
             id={`add-to-cart-${product.id}`}
-            onClick={() => onAddToCart(product)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCart(product);
+            }}
             disabled={isOutOfStock || isMaxedInCart}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
               isOutOfStock
